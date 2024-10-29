@@ -101,21 +101,21 @@ const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] =
 };
 
 // User code
-enum
+typedef enum
 {
     Q0,
     Q1,
     Q2,
     Q3
-};
+} quadrant_e;
 typedef enum
 {
     HOVERING,
     TOUCHING,
     REPORT
-} TOUCHPAD_t;
-TOUCHPAD_t pad_fsm = HOVERING;
-unsigned long touchStartTime = 0, touchEndTime = 0;
+} fsm_e;
+fsm_e touchFsm = HOVERING;
+unsigned long touchStartTime = 0UL, touchEndTime = 0UL;
 uint8_t touchStartQuadrant = 0xFF, touchLastQuadrant = 0xFF;
 
 // setup() gets called once at power-up, sets up serial debug output and Cirque's Pinnacle ASIC.
@@ -152,17 +152,18 @@ void loop()
     /*******************************************************************************
      * YOUR RUNNING CODE HERE
      ******************************************************************************/
-    Pinnacle_GetAbsolute(touchData); // update touch pad data
-    ClipCoordinates(&touchData);     // boundary check
+    Pinnacle_GetAbsolute(touchData); // update touchpad data
+    // ScaleData(absData_t * coordinates, uint16_t xResolution, uint16_t yResolution);
+    ClipCoordinates(&touchData); // boundary check
     Pinnacle_CheckValidTouch(&touchData);
-    switch (pad_fsm)
+    switch (touchFsm)
     {
     case HOVERING: // reset
         if (touchData.touchDown)
         {
             touchStartTime = millis();               // start timer
             touchStartQuadrant = getTouchQuadrant(); // save start quadrant
-            pad_fsm = TOUCHING;
+            touchFsm = TOUCHING;
         }
         break;
     case TOUCHING:
@@ -171,7 +172,7 @@ void loop()
         {
             touchLastQuadrant = getTouchQuadrant(); // save last quadrant
             touchEndTime = millis();
-            pad_fsm = REPORT;
+            touchFsm = REPORT;
         }
         break;
     case REPORT:
@@ -180,7 +181,7 @@ void loop()
             Serial.print("Tap in a quadrant Q");
             Serial.println(touchLastQuadrant, DEC);
         }
-        pad_fsm = HOVERING;
+        touchFsm = HOVERING;
         break;
     default:
         break;
