@@ -14,12 +14,13 @@ functionality shown below.
 
 The test can be broken up into the following tasks. 
 
-1. Determine if the circle touchpads are I2C or SPI interface
-2. Determine the overlay is curved or flat
+1. Determine if the circle touchpads are I2C or **SPI** interface
+2. Determine the overlay is curved or **flat**
 3. Clone the sample code for the correct interface and get that code built and running
 4. Modify the sample code to do the following:
     1. Imagine the sensor is divided into four quadrants
     2. When a touch appears in a quadrant, stays in that quadrant, and leaves within 300 msec you report a "tap in a quadrant" by printing to the serial port Qx. Where X is the quadrant number (0..3).
+    ![Quadrant](quadrant.png)
 	3. Test cases:
 	    1. The code has no compile warnings and no compile errors
         2. When nothing is touching the sensor, nothing should be reported

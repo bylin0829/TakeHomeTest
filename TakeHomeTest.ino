@@ -59,7 +59,8 @@
 #define ZONESCALE 256 // divisor for reducing x,y values to an array index for the LUT
 #define ROWS_Y ((PINNACLE_YMAX + 1) / ZONESCALE)
 #define COLS_X ((PINNACLE_XMAX + 1) / ZONESCALE)
-
+#define PINNACLE_X_HALF (PINNACLE_X_LOWER + PINNACLE_X_RANGE / 2)
+#define PINNACLE_Y_HALF (PINNACLE_Y_LOWER + PINNACLE_Y_RANGE / 2)
 // ADC-attenuation settings (held in BIT_7 and BIT_6)
 // 1X = most sensitive, 4X = least sensitive
 #define ADC_ATTENUATE_1X 0x00
@@ -99,6 +100,24 @@ const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] =
         {0, 0, 0, 0, 0, 0, 0, 0},
 };
 
+// User code
+enum
+{
+    Q0,
+    Q1,
+    Q2,
+    Q3
+};
+typedef enum
+{
+    HOVERING,
+    TOUCHING,
+    REPORT
+} TOUCHPAD_t;
+TOUCHPAD_t pad_fsm = HOVERING;
+unsigned long touchStartTime = 0, touchEndTime = 0;
+uint8_t touchStartQuadrant = 0xFF, touchLastQuadrant = 0xFF;
+
 // setup() gets called once at power-up, sets up serial debug output and Cirque's Pinnacle ASIC.
 void setup()
 {
@@ -133,8 +152,70 @@ void loop()
     /*******************************************************************************
      * YOUR RUNNING CODE HERE
      ******************************************************************************/
+    Pinnacle_GetAbsolute(touchData); // update touch pad data
+    ClipCoordinates(&touchData);     // boundary check
+    Pinnacle_CheckValidTouch(&touchData);
+    switch (pad_fsm)
+    {
+    case HOVERING: // reset
+        if (touchData.touchDown)
+        {
+            touchStartTime = millis();               // start timer
+            touchStartQuadrant = getTouchQuadrant(); // save start quadrant
+            pad_fsm = TOUCHING;
+        }
+        break;
+    case TOUCHING:
+        // save start quadrant and compare all of position
+        if (touchData.hovering)
+        {
+            touchLastQuadrant = getTouchQuadrant(); // save last quadrant
+            touchEndTime = millis();
+            pad_fsm = REPORT;
+        }
+        break;
+    case REPORT:
+        if (((touchEndTime - touchStartTime) < 300) && (touchLastQuadrant == touchStartQuadrant))
+        {
+            Serial.print("Tap in a quadrant Q");
+            Serial.println(touchLastQuadrant, DEC);
+        }
+        pad_fsm = HOVERING;
+        break;
+    default:
+        break;
+    }
 }
 
+uint8_t getTouchQuadrant()
+{
+    /*
+    Touch pad quadrant defination
+    (128,64)----------(1920,64)
+    |    Q1    |    Q0    |
+    |----------|----------|
+    |    Q2    |    Q3    |
+    (128,1472)--------(1920,1472)
+     */
+    uint8_t tempQuadrant = 0xFF;
+    if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF)
+    {
+        tempQuadrant = Q0;
+    }
+    else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF)
+    {
+        tempQuadrant = Q1;
+    }
+    else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF)
+    {
+        tempQuadrant = Q2;
+    }
+    else if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF)
+    {
+        tempQuadrant = Q3;
+    }
+    return tempQuadrant;
+}
 /*  Pinnacle-based TM0XX0XX Functions  */
 void Pinnacle_Init()
 {
