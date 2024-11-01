@@ -2,6 +2,14 @@
 
 #include <SPI.h>
 
+// #define __DEBUG__ // If you do not want to display debugging messages, please comment this line
+
+#ifdef __DEBUG__
+#define DEBUG(...) Serial.println(__VA_ARGS__)
+#else
+#define DEBUG(...)
+#endif
+
 // ___ Using a Cirque TM0XX0XX w/ Curved Overlay and Arduino ___
 // This demonstration application is built to work with a Teensy 3.1/3.2 but it can easily be adapted to
 // work with Arduino-based systems.
@@ -25,11 +33,19 @@
 //  DR = Pin 7
 
 // Hardware pin-number labels
+#define SENSOR 0
+
 #define SCK_PIN 13
 #define DIN_PIN 12
 #define DOUT_PIN 11
-#define CS_PIN 10
+
+#if SENSOR == 0
+#define CS_PIN 10 // sensor 0
 #define DR_PIN 9
+#elif SENSOR == 1
+#define CS_PIN 8 // sensor 1
+#define DR_PIN 7
+#endif
 
 #define SDA_PIN 18
 #define SCL_PIN 19
@@ -91,13 +107,13 @@ absData_t touchData;
 // Each element represents the Z-value below which is considered "hovering" in that XY region of the sensor.
 // The values present are not guaranteed to work for all HW configurations.
 const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] =
-    {
-        {0, 0, 0, 0, 0, 0, 0, 0},
-        {0, 2, 3, 5, 5, 3, 2, 0},
-        {0, 3, 5, 15, 15, 5, 2, 0},
-        {0, 3, 5, 15, 15, 5, 3, 0},
-        {0, 2, 3, 5, 5, 3, 2, 0},
-        {0, 0, 0, 0, 0, 0, 0, 0},
+{
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 2, 3, 5, 5, 3, 2, 0},
+    {0, 3, 5, 15, 15, 5, 2, 0},
+    {0, 3, 5, 15, 15, 5, 3, 0},
+    {0, 2, 3, 5, 5, 3, 2, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0},
 };
 
 // User code
@@ -110,11 +126,11 @@ typedef enum
 } quadrant_e;
 typedef enum
 {
-    HOVERING,
+    NO_TOUCH,
     TOUCHING,
     REPORT
 } fsm_e;
-fsm_e touchFsm = HOVERING;
+fsm_e touchFsm = NO_TOUCH;
 unsigned long touchStartTime = 0UL, touchEndTime = 0UL;
 uint8_t touchStartQuadrant = 0xFF, touchLastQuadrant = 0xFF;
 
@@ -152,39 +168,55 @@ void loop()
     /*******************************************************************************
      * YOUR RUNNING CODE HERE
      ******************************************************************************/
-    Pinnacle_GetAbsolute(touchData); // update touchpad data
-    // ScaleData(absData_t * coordinates, uint16_t xResolution, uint16_t yResolution);
-    ClipCoordinates(&touchData); // boundary check
-    Pinnacle_CheckValidTouch(&touchData);
-    switch (touchFsm)
+    if (DR_Asserted()) // if data ready
     {
-    case HOVERING: // reset
-        if (touchData.touchDown)
-        {
-            touchStartTime = millis();               // start timer
-            touchStartQuadrant = getTouchQuadrant(); // save start quadrant
-            touchFsm = TOUCHING;
+        DEBUG("In loop");
+        Pinnacle_GetAbsolute(touchData); // update touchpad data
+        Pinnacle_CheckValidTouch(&touchData);
+        // ScaleData(absData_t * coordinates, uint16_t xResolution, uint16_t yResolution);
+        // ClipCoordinates(&touchData); // boundary check
+        switch (touchFsm) {
+        case NO_TOUCH:
+            if (touchData.touchDown) {
+                DEBUG("FSM NO_TOUCH");
+                DEBUG(touchData.xValue);
+                DEBUG(touchData.yValue);
+                DEBUG(touchData.zValue);
+                touchStartTime = millis(); // start timer
+                touchStartQuadrant = getTouchQuadrant();  // save start quadrant
+                touchFsm = TOUCHING;
+            }
+            break;
+        case TOUCHING:
+            // save start quadrant and compare all of position
+            if (touchData.hovering) {
+                DEBUG("FSM TOUCHING");
+                DEBUG(touchData.xValue);
+                DEBUG(touchData.yValue);
+                DEBUG(touchData.zValue);
+                touchEndTime = millis(); // end timer
+                touchLastQuadrant = getTouchQuadrant();  // save last quadrant
+                touchFsm = REPORT;
+            }
+            break;
+        case REPORT:
+            DEBUG("FSM REPORT\n");
+            DEBUG("Time interval");
+            DEBUG(touchEndTime - touchStartTime, DEC);
+            DEBUG("Touch quadrant: ");
+            DEBUG(touchLastQuadrant);
+            DEBUG(touchStartQuadrant);
+            if (((touchEndTime - touchStartTime) < 300) && (touchLastQuadrant == touchStartQuadrant)) {
+                Serial.print("Tap in a quadrant Q");
+                Serial.println(touchLastQuadrant, DEC);
+            }
+            touchFsm = NO_TOUCH;
+
+            DEBUG("=====End=====");
+            break;
+        default:
+            break;
         }
-        break;
-    case TOUCHING:
-        // save start quadrant and compare all of position
-        if (touchData.hovering)
-        {
-            touchLastQuadrant = getTouchQuadrant(); // save last quadrant
-            touchEndTime = millis();
-            touchFsm = REPORT;
-        }
-        break;
-    case REPORT:
-        if (((touchEndTime - touchStartTime) < 300) && (touchLastQuadrant == touchStartQuadrant))
-        {
-            Serial.print("Tap in a quadrant Q");
-            Serial.println(touchLastQuadrant, DEC);
-        }
-        touchFsm = HOVERING;
-        break;
-    default:
-        break;
     }
 }
 
@@ -193,27 +225,27 @@ uint8_t getTouchQuadrant()
     /*
     Touch pad quadrant defination
     (128,64)----------(1920,64)
-    |    Q1    |    Q0    |
+    |    Q0    |    Q1    |
     |----------|----------|
-    |    Q2    |    Q3    |
+    |    Q3    |    Q2    |
     (128,1472)--------(1920,1472)
      */
     uint8_t tempQuadrant = 0xFF;
     if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF)
     {
-        tempQuadrant = Q0;
+        tempQuadrant = Q1;
     }
     else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF)
     {
-        tempQuadrant = Q1;
+        tempQuadrant = Q0;
     }
     else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF)
     {
-        tempQuadrant = Q2;
+        tempQuadrant = Q3;
     }
     else if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF)
     {
-        tempQuadrant = Q3;
+        tempQuadrant = Q2;
     }
     return tempQuadrant;
 }
@@ -241,9 +273,9 @@ void Pinnacle_Init()
 
 // Reads XYZ data from Pinnacle registers 0x14 through 0x17
 // Stores result in absData_t struct with xValue, yValue, and zValue members
-void Pinnacle_GetAbsolute(absData_t &result)
+void Pinnacle_GetAbsolute(absData_t& result)
 {
-    uint8_t data[6] = {0, 0, 0, 0, 0, 0};
+    uint8_t data[6] = { 0, 0, 0, 0, 0, 0 };
     RAP_ReadBytes(0x12, data, 6);
 
     Pinnacle_ClearFlags();
@@ -257,7 +289,7 @@ void Pinnacle_GetAbsolute(absData_t &result)
 }
 
 // Checks touch data to see if it is a z-idle packet (all zeros)
-bool Pinnacle_zIdlePacket(absData_t *data)
+bool Pinnacle_zIdlePacket(absData_t* data)
 {
     return data->xValue == 0 && data->yValue == 0 && data->zValue == 0;
 }
@@ -302,8 +334,8 @@ void setAdcAttenuation(uint8_t adcGain)
     temp |= adcGain;
     ERA_WriteByte(0x0187, temp);
     ERA_ReadBytes(0x0187, &temp, 1);
-    Serial.print("ADC gain set to:\t");
-    Serial.print(temp &= 0xC0, HEX);
+    DEBUG("ADC gain set to:\t");
+    DEBUG(temp &= 0xC0, HEX);
     switch (temp)
     {
     case ADC_ATTENUATE_1X:
@@ -331,21 +363,21 @@ void tuneEdgeSensitivity()
     Serial.println();
     Serial.println("Setting xAxis.WideZMin...");
     ERA_ReadBytes(0x0149, &temp, 1);
-    Serial.print("Current value:\t");
+    DEBUG("Current value:\t");
     Serial.println(temp, HEX);
     ERA_WriteByte(0x0149, 0x04);
     ERA_ReadBytes(0x0149, &temp, 1);
-    Serial.print("New value:\t");
+    DEBUG("New value:\t");
     Serial.println(temp, HEX);
 
     Serial.println();
     Serial.println("Setting yAxis.WideZMin...");
     ERA_ReadBytes(0x0168, &temp, 1);
-    Serial.print("Current value:\t");
+    DEBUG("Current value:\t");
     Serial.println(temp, HEX);
     ERA_WriteByte(0x0168, 0x03);
     ERA_ReadBytes(0x0168, &temp, 1);
-    Serial.print("New value:\t");
+    DEBUG("New value:\t");
     Serial.println(temp, HEX);
 }
 
@@ -357,7 +389,7 @@ void tuneEdgeSensitivity()
 // point will likely have excessive sensitivity. This means the sensor can detect a finger that isn't actually contacting the overlay in the shallower area.
 // ZVALUE_MAP[][] stores a lookup table in which you can define the Z-value and XY position that is considered "hovering". Experimentation/tuning is required.
 // NOTE: Z-value output decreases to 0 as you move your finger away from the sensor, and it's maximum value is 0x63 (6-bits).
-void Pinnacle_CheckValidTouch(absData_t *touchData)
+void Pinnacle_CheckValidTouch(absData_t* touchData)
 {
     uint32_t zone_x, zone_y;
     // eliminate hovering
@@ -389,7 +421,7 @@ void Pinnacle_forceCalibration(void)
 /*  ERA (Extended Register Access) Functions  */
 // Reads <count> bytes from an extended register at <address> (16-bit address),
 // stores values in <*data>
-void ERA_ReadBytes(uint16_t address, uint8_t *data, uint16_t count)
+void ERA_ReadBytes(uint16_t address, uint8_t* data, uint16_t count)
 {
     uint8_t ERAControlValue = 0xFF;
 
@@ -446,7 +478,7 @@ void RAP_Init()
 }
 
 // Reads <count> Pinnacle registers starting at <address>
-void RAP_ReadBytes(byte address, byte *data, byte count)
+void RAP_ReadBytes(byte address, byte* data, byte count)
 {
     byte cmdByte = READ_MASK | address; // Form the READ command byte
 
@@ -483,7 +515,7 @@ void RAP_Write(byte address, byte data)
 /*  Logical Scaling Functions */
 // Clips raw coordinates to "reachable" window of sensor
 // NOTE: values outside this window can only appear as a result of noise
-void ClipCoordinates(absData_t *coordinates)
+void ClipCoordinates(absData_t* coordinates)
 {
     if (coordinates->xValue < PINNACLE_X_LOWER)
     {
@@ -504,7 +536,7 @@ void ClipCoordinates(absData_t *coordinates)
 }
 
 // Scales data to desired X & Y resolution
-void ScaleData(absData_t *coordinates, uint16_t xResolution, uint16_t yResolution)
+void ScaleData(absData_t* coordinates, uint16_t xResolution, uint16_t yResolution)
 {
     uint32_t xTemp = 0;
     uint32_t yTemp = 0;
