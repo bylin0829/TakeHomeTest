@@ -14,20 +14,28 @@ functionality shown below.
 
 The test can be broken up into the following tasks. 
 
-1. Determine if the circle touchpads are I2C or **SPI** interface
-2. Determine the overlay is curved or **flat**
+1. Determine if the circle touchpads are I2C or SPI interface
+    * SPI, R1 is 470k ohm
+2. Determine the overlay is curved or flat
+    * Curved
 3. Clone the sample code for the correct interface and get that code built and running
 4. Modify the sample code to do the following:
     1. Imagine the sensor is divided into four quadrants
     2. When a touch appears in a quadrant, stays in that quadrant, and leaves within 300 msec you report a "tap in a quadrant" by printing to the serial port Qx. Where X is the quadrant number (0..3).
-    ![Quadrant](quadrant.png)
+        * Quadrant definition in the code. ![Quadrant](quadrant.jpg)
 	3. Test cases:
 	    1. The code has no compile warnings and no compile errors
+            * Pass
         2. When nothing is touching the sensor, nothing should be reported
+            * Pass
         3. If a finger touches a quadrant, stays in that quadrant, and lifts off within 300 msec the report happens at lift-off of the finger
+            * Pass
         4. If the finger touches a quadrant and slides to another quadrant, then lifts off, nothing is reported
+            * Pass
         5. If a finger touches a quadrant, stays touching for more than 300 msec, then lifts off, nothing is reported
+            * Pass
         6. After a touch is complete and tap reporting is complete, test case ii applies
+            * Pass
 5. Send the code in for review
 
 ## Helpful Links
@@ -50,3 +58,11 @@ and Teensy documentation and examples.
 
 Zip up your project and email it to Jon (jonb of cirque period com).
 *email addresses are "some assembly required"
+
+## Test Record
+
+1. Test code in TM035035 and TM040040.
+2. Check device specifications. SPI and curved.
+3. Data of touching are correct, but the data of finger lift are only available in "available area".
+![available area](available%20area.jpg)
+4. Try to tune ZVALUE_MAP.

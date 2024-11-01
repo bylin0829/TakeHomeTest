@@ -33,17 +33,17 @@
 //  DR = Pin 7
 
 // Hardware pin-number labels
-#define SENSOR 0
+#define SENSOR 0  // change SENSOR number to apply other devices. Available number are 0 and 1.
 
 #define SCK_PIN 13
 #define DIN_PIN 12
 #define DOUT_PIN 11
 
-#if SENSOR == 0
-#define CS_PIN 10 // sensor 0
+#if (SENSOR == 0)
+#define CS_PIN 10  // sensor 0
 #define DR_PIN 9
-#elif SENSOR == 1
-#define CS_PIN 8 // sensor 1
+#elif (SENSOR == 1)
+#define CS_PIN 8  // sensor 1
 #define DR_PIN 7
 #endif
 
@@ -64,15 +64,15 @@
 #define Z_IDLE_COUNT 0x05
 
 // Coordinate scaling values
-#define PINNACLE_XMAX 2047    // max value Pinnacle can report for X
-#define PINNACLE_YMAX 1535    // max value Pinnacle can report for Y
-#define PINNACLE_X_LOWER 127  // min "reachable" X value
-#define PINNACLE_X_UPPER 1919 // max "reachable" X value
-#define PINNACLE_Y_LOWER 63   // min "reachable" Y value
-#define PINNACLE_Y_UPPER 1471 // max "reachable" Y value
+#define PINNACLE_XMAX 2047     // max value Pinnacle can report for X
+#define PINNACLE_YMAX 1535     // max value Pinnacle can report for Y
+#define PINNACLE_X_LOWER 127   // min "reachable" X value
+#define PINNACLE_X_UPPER 1919  // max "reachable" X value
+#define PINNACLE_Y_LOWER 63    // min "reachable" Y value
+#define PINNACLE_Y_UPPER 1471  // max "reachable" Y value
 #define PINNACLE_X_RANGE (PINNACLE_X_UPPER - PINNACLE_X_LOWER)
 #define PINNACLE_Y_RANGE (PINNACLE_Y_UPPER - PINNACLE_Y_LOWER)
-#define ZONESCALE 256 // divisor for reducing x,y values to an array index for the LUT
+#define ZONESCALE 256  // divisor for reducing x,y values to an array index for the LUT
 #define ROWS_Y ((PINNACLE_YMAX + 1) / ZONESCALE)
 #define COLS_X ((PINNACLE_XMAX + 1) / ZONESCALE)
 #define PINNACLE_X_HALF (PINNACLE_X_LOWER + PINNACLE_X_RANGE / 2)
@@ -87,8 +87,7 @@
 #define TAP_TIMEOUT_MSEC 300
 
 // Convenient way to store and access measurements
-typedef struct _absData
-{
+typedef struct _absData {
     uint16_t xValue;
     uint16_t yValue;
     uint16_t zValue;
@@ -106,26 +105,36 @@ absData_t touchData;
 // These values require tuning for optimal touch-response
 // Each element represents the Z-value below which is considered "hovering" in that XY region of the sensor.
 // The values present are not guaranteed to work for all HW configurations.
-const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] =
-{
-    {0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 2, 3, 5, 5, 3, 2, 0},
-    {0, 3, 5, 15, 15, 5, 2, 0},
-    {0, 3, 5, 15, 15, 5, 3, 0},
-    {0, 2, 3, 5, 5, 3, 2, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0},
+
+
+// original
+const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] = {
+  { 0, 0, 0, 0, 0, 0, 0, 0 },
+  { 0, 2, 3, 5, 5, 3, 2, 0 },
+  { 0, 3, 5, 15, 15, 5, 2, 0 },
+  { 0, 3, 5, 15, 15, 5, 3, 0 },
+  { 0, 2, 3, 5, 5, 3, 2, 0 },
+  { 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 
+// TODO: Tune and verification
+// const uint8_t ZVALUE_MAP[ROWS_Y][COLS_X] = {
+//   { 0, 0, 0, 0, 0, 0, 0, 0 },
+//   { 0, 4, 7, 10, 10, 7, 4, 0 },
+//   { 0, 7, 10, 15, 15, 10, 4, 0 },
+//   { 0, 7, 10, 15, 15, 10, 7, 0 },
+//   { 0, 4, 7, 10, 10, 7, 4, 0 },
+//   { 0, 0, 0, 0, 0, 0, 0, 0 },
+// };
+
 // User code
-typedef enum
-{
+typedef enum {
     Q0,
     Q1,
     Q2,
     Q3
 } quadrant_e;
-typedef enum
-{
+typedef enum {
     NO_TOUCH,
     TOUCHING,
     REPORT
@@ -135,15 +144,14 @@ unsigned long touchStartTime = 0UL, touchEndTime = 0UL;
 uint8_t touchStartQuadrant = 0xFF, touchLastQuadrant = 0xFF;
 
 // setup() gets called once at power-up, sets up serial debug output and Cirque's Pinnacle ASIC.
-void setup()
-{
+void setup() {
     Serial.begin(115200);
     while (!Serial)
-        ; // Wait for USB serial port to enumerate
+        ;  // Wait for USB serial port to enumerate
 
-    /*******************************************************************************
-     * YOUR STARTUP CODE HERE
-     ******************************************************************************/
+      /*******************************************************************************
+             * YOUR STARTUP CODE HERE
+             ******************************************************************************/
 
     pinMode(LED_0, OUTPUT);
 
@@ -163,18 +171,17 @@ void setup()
 }
 
 // loop() continuously checks to see if data-ready (DR) is high. If so, reads and reports touch data to terminal.
-void loop()
-{
+void loop() {
     /*******************************************************************************
-     * YOUR RUNNING CODE HERE
-     ******************************************************************************/
-    if (DR_Asserted()) // if data ready
+         * YOUR RUNNING CODE HERE
+         ******************************************************************************/
+    if (DR_Asserted())  // if data ready
     {
         DEBUG("In loop");
-        Pinnacle_GetAbsolute(touchData); // update touchpad data
+        Pinnacle_GetAbsolute(touchData);  // update touchpad data
         Pinnacle_CheckValidTouch(&touchData);
         // ScaleData(absData_t * coordinates, uint16_t xResolution, uint16_t yResolution);
-        // ClipCoordinates(&touchData); // boundary check
+        ClipCoordinates(&touchData);  // boundary check
         switch (touchFsm) {
         case NO_TOUCH:
             if (touchData.touchDown) {
@@ -182,25 +189,26 @@ void loop()
                 DEBUG(touchData.xValue);
                 DEBUG(touchData.yValue);
                 DEBUG(touchData.zValue);
-                touchStartTime = millis(); // start timer
+                touchStartTime = millis();                // start timer
                 touchStartQuadrant = getTouchQuadrant();  // save start quadrant
                 touchFsm = TOUCHING;
             }
             break;
         case TOUCHING:
             // save start quadrant and compare all of position
+            // TODO: Last touch data when finger lift is not enough sensitive. May need
             if (touchData.hovering) {
                 DEBUG("FSM TOUCHING");
                 DEBUG(touchData.xValue);
                 DEBUG(touchData.yValue);
                 DEBUG(touchData.zValue);
-                touchEndTime = millis(); // end timer
+                touchEndTime = millis();                 // end timer
                 touchLastQuadrant = getTouchQuadrant();  // save last quadrant
                 touchFsm = REPORT;
             }
             break;
         case REPORT:
-            DEBUG("FSM REPORT\n");
+            DEBUG("FSM REPORT");
             DEBUG("Time interval");
             DEBUG(touchEndTime - touchStartTime, DEC);
             DEBUG("Touch quadrant: ");
@@ -211,8 +219,6 @@ void loop()
                 Serial.println(touchLastQuadrant, DEC);
             }
             touchFsm = NO_TOUCH;
-
-            DEBUG("=====End=====");
             break;
         default:
             break;
@@ -220,38 +226,33 @@ void loop()
     }
 }
 
-uint8_t getTouchQuadrant()
-{
+uint8_t getTouchQuadrant() {
     /*
-    Touch pad quadrant defination
-    (128,64)----------(1920,64)
-    |    Q0    |    Q1    |
-    |----------|----------|
-    |    Q3    |    Q2    |
-    (128,1472)--------(1920,1472)
-     */
+        Touch pad quadrant defination
+        (128,64)----------(1920,64)
+        |    Q0    |    Q1    |
+        |----------|----------|
+        |    Q3    |    Q2    |
+        (128,1472)--------(1920,1472)
+         */
     uint8_t tempQuadrant = 0xFF;
-    if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF)
-    {
-        tempQuadrant = Q1;
-    }
-    else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF)
-    {
+    if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF) {
         tempQuadrant = Q0;
     }
-    else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF)
-    {
-        tempQuadrant = Q3;
+    else if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue < PINNACLE_Y_HALF) {
+        tempQuadrant = Q1;
     }
-    else if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF)
-    {
+    else if (touchData.xValue > PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF) {
         tempQuadrant = Q2;
     }
+    else if (touchData.xValue < PINNACLE_X_HALF && touchData.yValue > PINNACLE_Y_HALF) {
+        tempQuadrant = Q3;
+    }
+
     return tempQuadrant;
 }
 /*  Pinnacle-based TM0XX0XX Functions  */
-void Pinnacle_Init()
-{
+void Pinnacle_Init() {
     RAP_Init();
     DeAssert_CS();
     pinMode(DR_PIN, INPUT);
@@ -273,8 +274,7 @@ void Pinnacle_Init()
 
 // Reads XYZ data from Pinnacle registers 0x14 through 0x17
 // Stores result in absData_t struct with xValue, yValue, and zValue members
-void Pinnacle_GetAbsolute(absData_t& result)
-{
+void Pinnacle_GetAbsolute(absData_t& result) {
     uint8_t data[6] = { 0, 0, 0, 0, 0, 0 };
     RAP_ReadBytes(0x12, data, 6);
 
@@ -289,33 +289,28 @@ void Pinnacle_GetAbsolute(absData_t& result)
 }
 
 // Checks touch data to see if it is a z-idle packet (all zeros)
-bool Pinnacle_zIdlePacket(absData_t* data)
-{
+bool Pinnacle_zIdlePacket(absData_t* data) {
     return data->xValue == 0 && data->yValue == 0 && data->zValue == 0;
 }
 
 // Clears Status1 register flags (SW_CC and SW_DR)
-void Pinnacle_ClearFlags()
-{
+void Pinnacle_ClearFlags() {
     RAP_Write(0x02, 0x00);
     delayMicroseconds(50);
 }
 
 // Enables/Disables the feed
-void Pinnacle_EnableFeed(bool feedEnable)
-{
+void Pinnacle_EnableFeed(bool feedEnable) {
     uint8_t temp;
 
-    RAP_ReadBytes(0x04, &temp, 1); // Store contents of FeedConfig1 register
+    RAP_ReadBytes(0x04, &temp, 1);  // Store contents of FeedConfig1 register
 
-    if (feedEnable)
-    {
-        temp |= 0x01; // Set Feed Enable bit
+    if (feedEnable) {
+        temp |= 0x01;  // Set Feed Enable bit
         RAP_Write(0x04, temp);
     }
-    else
-    {
-        temp &= ~0x01; // Clear Feed Enable bit
+    else {
+        temp &= ~0x01;  // Clear Feed Enable bit
         RAP_Write(0x04, temp);
     }
 }
@@ -323,21 +318,19 @@ void Pinnacle_EnableFeed(bool feedEnable)
 /*  Curved Overlay Functions  */
 // Adjusts the feedback in the ADC, effectively attenuating the finger signal
 // By default, the the signal is maximally attenuated (ADC_ATTENUATE_4X for use with thin, flat overlays
-void setAdcAttenuation(uint8_t adcGain)
-{
+void setAdcAttenuation(uint8_t adcGain) {
     uint8_t temp = 0x00;
 
     Serial.println();
     Serial.println("Setting ADC gain...");
     ERA_ReadBytes(0x0187, &temp, 1);
-    temp &= 0x3F; // clear top two bits
+    temp &= 0x3F;  // clear top two bits
     temp |= adcGain;
     ERA_WriteByte(0x0187, temp);
     ERA_ReadBytes(0x0187, &temp, 1);
     DEBUG("ADC gain set to:\t");
     DEBUG(temp &= 0xC0, HEX);
-    switch (temp)
-    {
+    switch (temp) {
     case ADC_ATTENUATE_1X:
         Serial.println(" (X/1)");
         break;
@@ -356,8 +349,7 @@ void setAdcAttenuation(uint8_t adcGain)
 }
 
 // Changes thresholds to improve detection of fingers
-void tuneEdgeSensitivity()
-{
+void tuneEdgeSensitivity() {
     uint8_t temp = 0x00;
 
     Serial.println();
@@ -389,8 +381,7 @@ void tuneEdgeSensitivity()
 // point will likely have excessive sensitivity. This means the sensor can detect a finger that isn't actually contacting the overlay in the shallower area.
 // ZVALUE_MAP[][] stores a lookup table in which you can define the Z-value and XY position that is considered "hovering". Experimentation/tuning is required.
 // NOTE: Z-value output decreases to 0 as you move your finger away from the sensor, and it's maximum value is 0x63 (6-bits).
-void Pinnacle_CheckValidTouch(absData_t* touchData)
-{
+void Pinnacle_CheckValidTouch(absData_t* touchData) {
     uint32_t zone_x, zone_y;
     // eliminate hovering
     zone_x = touchData->xValue / ZONESCALE;
@@ -401,8 +392,7 @@ void Pinnacle_CheckValidTouch(absData_t* touchData)
 // Forces Pinnacle to re-calibrate. If the touchpad is reporting touches when
 // no fingers are on the pad then calibration (compensation) is wrong.
 // Calling this function will fix the problem. Warning, re-enable the feed after calling this.
-void Pinnacle_forceCalibration(void)
-{
+void Pinnacle_forceCalibration(void) {
     uint8_t CalConfig1Value = 0x00;
 
     Pinnacle_EnableFeed(false);
@@ -410,8 +400,7 @@ void Pinnacle_forceCalibration(void)
     CalConfig1Value |= 0x01;
     RAP_Write(0x07, CalConfig1Value);
 
-    do
-    {
+    do {
         RAP_ReadBytes(0x07, &CalConfig1Value, 1);
     } while (CalConfig1Value & 0x01);
 
@@ -421,22 +410,19 @@ void Pinnacle_forceCalibration(void)
 /*  ERA (Extended Register Access) Functions  */
 // Reads <count> bytes from an extended register at <address> (16-bit address),
 // stores values in <*data>
-void ERA_ReadBytes(uint16_t address, uint8_t* data, uint16_t count)
-{
+void ERA_ReadBytes(uint16_t address, uint8_t* data, uint16_t count) {
     uint8_t ERAControlValue = 0xFF;
 
-    Pinnacle_EnableFeed(false); // Disable feed
+    Pinnacle_EnableFeed(false);  // Disable feed
 
-    RAP_Write(0x1C, (uint8_t)(address >> 8));     // Send upper byte of ERA address
-    RAP_Write(0x1D, (uint8_t)(address & 0x00FF)); // Send lower byte of ERA address
+    RAP_Write(0x1C, (uint8_t)(address >> 8));      // Send upper byte of ERA address
+    RAP_Write(0x1D, (uint8_t)(address & 0x00FF));  // Send lower byte of ERA address
 
-    for (uint16_t i = 0; i < count; i++)
-    {
-        RAP_Write(0x1E, 0x05); // Signal ERA-read (auto-increment) to Pinnacle
+    for (uint16_t i = 0; i < count; i++) {
+        RAP_Write(0x1E, 0x05);  // Signal ERA-read (auto-increment) to Pinnacle
 
         // Wait for status register 0x1E to clear
-        do
-        {
+        do {
             RAP_ReadBytes(0x1E, &ERAControlValue, 1);
         } while (ERAControlValue != 0x00);
 
@@ -447,22 +433,20 @@ void ERA_ReadBytes(uint16_t address, uint8_t* data, uint16_t count)
 }
 
 // Writes a byte, <data>, to an extended register at <address> (16-bit address)
-void ERA_WriteByte(uint16_t address, uint8_t data)
-{
+void ERA_WriteByte(uint16_t address, uint8_t data) {
     uint8_t ERAControlValue = 0xFF;
 
-    Pinnacle_EnableFeed(false); // Disable feed
+    Pinnacle_EnableFeed(false);  // Disable feed
 
-    RAP_Write(0x1B, data); // Send data byte to be written
+    RAP_Write(0x1B, data);  // Send data byte to be written
 
-    RAP_Write(0x1C, (uint8_t)(address >> 8));     // Upper byte of ERA address
-    RAP_Write(0x1D, (uint8_t)(address & 0x00FF)); // Lower byte of ERA address
+    RAP_Write(0x1C, (uint8_t)(address >> 8));      // Upper byte of ERA address
+    RAP_Write(0x1D, (uint8_t)(address & 0x00FF));  // Lower byte of ERA address
 
-    RAP_Write(0x1E, 0x02); // Signal an ERA-write to Pinnacle
+    RAP_Write(0x1E, 0x02);  // Signal an ERA-write to Pinnacle
 
     // Wait for status register 0x1E to clear
-    do
-    {
+    do {
         RAP_ReadBytes(0x1E, &ERAControlValue, 1);
     } while (ERAControlValue != 0x00);
 
@@ -471,26 +455,23 @@ void ERA_WriteByte(uint16_t address, uint8_t data)
 
 /*  RAP Functions */
 
-void RAP_Init()
-{
+void RAP_Init() {
     pinMode(CS_PIN, OUTPUT);
     SPI.begin();
 }
 
 // Reads <count> Pinnacle registers starting at <address>
-void RAP_ReadBytes(byte address, byte* data, byte count)
-{
-    byte cmdByte = READ_MASK | address; // Form the READ command byte
+void RAP_ReadBytes(byte address, byte* data, byte count) {
+    byte cmdByte = READ_MASK | address;  // Form the READ command byte
 
     SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE1));
 
     Assert_CS();
-    SPI.transfer(cmdByte); // Signal a RAP-read operation starting at <address>
-    SPI.transfer(0xFC);    // Filler byte
-    SPI.transfer(0xFC);    // Filler byte
-    for (byte i = 0; i < count; i++)
-    {
-        data[i] = SPI.transfer(0xFC); // Each subsequent SPI transfer gets another register's contents
+    SPI.transfer(cmdByte);  // Signal a RAP-read operation starting at <address>
+    SPI.transfer(0xFC);     // Filler byte
+    SPI.transfer(0xFC);     // Filler byte
+    for (byte i = 0; i < count; i++) {
+        data[i] = SPI.transfer(0xFC);  // Each subsequent SPI transfer gets another register's contents
     }
     DeAssert_CS();
 
@@ -498,15 +479,14 @@ void RAP_ReadBytes(byte address, byte* data, byte count)
 }
 
 // Writes single-byte <data> to <address>
-void RAP_Write(byte address, byte data)
-{
-    byte cmdByte = WRITE_MASK | address; // Form the WRITE command byte
+void RAP_Write(byte address, byte data) {
+    byte cmdByte = WRITE_MASK | address;  // Form the WRITE command byte
 
     SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE1));
 
     Assert_CS();
-    SPI.transfer(cmdByte); // Signal a write to register at <address>
-    SPI.transfer(data);    // Send <value> to be written to register
+    SPI.transfer(cmdByte);  // Signal a write to register at <address>
+    SPI.transfer(data);     // Send <value> to be written to register
     DeAssert_CS();
 
     SPI.endTransaction();
@@ -515,29 +495,23 @@ void RAP_Write(byte address, byte data)
 /*  Logical Scaling Functions */
 // Clips raw coordinates to "reachable" window of sensor
 // NOTE: values outside this window can only appear as a result of noise
-void ClipCoordinates(absData_t* coordinates)
-{
-    if (coordinates->xValue < PINNACLE_X_LOWER)
-    {
+void ClipCoordinates(absData_t* coordinates) {
+    if (coordinates->xValue < PINNACLE_X_LOWER) {
         coordinates->xValue = PINNACLE_X_LOWER;
     }
-    else if (coordinates->xValue > PINNACLE_X_UPPER)
-    {
+    else if (coordinates->xValue > PINNACLE_X_UPPER) {
         coordinates->xValue = PINNACLE_X_UPPER;
     }
-    if (coordinates->yValue < PINNACLE_Y_LOWER)
-    {
+    if (coordinates->yValue < PINNACLE_Y_LOWER) {
         coordinates->yValue = PINNACLE_Y_LOWER;
     }
-    else if (coordinates->yValue > PINNACLE_Y_UPPER)
-    {
+    else if (coordinates->yValue > PINNACLE_Y_UPPER) {
         coordinates->yValue = PINNACLE_Y_UPPER;
     }
 }
 
 // Scales data to desired X & Y resolution
-void ScaleData(absData_t* coordinates, uint16_t xResolution, uint16_t yResolution)
-{
+void ScaleData(absData_t* coordinates, uint16_t xResolution, uint16_t yResolution) {
     uint32_t xTemp = 0;
     uint32_t yTemp = 0;
 
@@ -556,22 +530,18 @@ void ScaleData(absData_t* coordinates, uint16_t xResolution, uint16_t yResolutio
 }
 
 /*  I/O Functions */
-void Assert_CS()
-{
+void Assert_CS() {
     digitalWrite(CS_PIN, LOW);
 }
 
-void DeAssert_CS()
-{
+void DeAssert_CS() {
     digitalWrite(CS_PIN, HIGH);
 }
 
-void AssertSensorLED(bool state)
-{
+void AssertSensorLED(bool state) {
     digitalWrite(LED_0, !state);
 }
 
-bool DR_Asserted()
-{
+bool DR_Asserted() {
     return digitalRead(DR_PIN);
 }
